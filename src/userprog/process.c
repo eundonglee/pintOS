@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -30,6 +31,8 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  char *thread_name;
+  int thread_name_length;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -38,11 +41,62 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  /* Parse a string before the first whitespace. */
+  thread_name_length = strcspn(file_name, " ");
+  thread_name = malloc (thread_name_length + 1);
+  strlcpy(thread_name, file_name, thread_name_length + 1);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (thread_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
+  free (thread_name);
   return tid;
+}
+
+void argument_stack (char **parse, int count, void **esp)
+{
+  char **argv;
+  int i, j, k;
+  int argLength;
+  int totalArgLength;
+
+  /* Push arguments in stack  and save address in which arguments are pushed. */
+  argv = malloc(count * 4);
+  totalArgLength = 0;
+  for (i = count - 1 ; i > -1 ; i--)
+  { 
+    argLength = strlen(parse[i]);
+    for (j = argLength ; j > -1 ; j--)
+    {
+      *esp = *esp - 1;
+      totalArgLength = totalArgLength + 1;
+      ** (char **)esp = parse[i][j];
+    }
+    argv[i] = *esp;
+  }
+  *esp = *esp - ((4 - totalArgLength % 4) ? totalArgLength % 4 != 0 : 0);
+
+  /* Push argv in stack. */
+  *esp = *esp - 4;
+  ** (char ***)esp = 0;
+  for (k = count - 1 ; k > -1 ; k--)
+  {
+    *esp = *esp - 4;
+    ** (char ***)esp = argv[k];
+  }
+  *esp = *esp - 4;
+  ** (char ****)esp = *esp + 4;
+  
+  /* Push argc. */
+  *esp = *esp - 4;
+  ** (int **)esp = count;
+
+  /* Push return address */
+  *esp = *esp - 4;
+  ** (void ***)esp = 0;
+
+  free(argv);
 }
 
 /* A thread function that loads a user process and starts it
@@ -51,20 +105,57 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
-  struct intr_frame if_;
   bool success;
+  char *fn_copy;
+  int file_name_length;
+  char *token;
+  char *save_ptr;
+  int parse_size;
+  char **parse;
+  int count;
+  struct intr_frame if_;
+  
+  /* Tokenize FILE_NAME. */
+  file_name_length = strlen(file_name);
+  fn_copy = malloc((file_name_length+1) * sizeof(char));
+  strlcpy(fn_copy, file_name, file_name_length+1);
+
+  token = strtok_r(fn_copy, " ", &save_ptr);
+  parse_size = 5;
+  parse = malloc(parse_size * sizeof(char *));
+  count = 0;
+
+  int i = 0;
+  while (token)
+  { 
+    count++;
+    /* Expand memory allocation if required. */
+    if (count > parse_size)
+    {
+      parse_size = parse_size + 5;
+      realloc(parse, parse_size * sizeof(char *));
+    }
+    parse[i] = token;
+    i++;
+    token = strtok_r(NULL, " ", &save_ptr);
+  }
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (parse[0], &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+
+  /* Save arguments on stack. */
+  argument_stack(parse, count, &if_.esp);
+  free (parse);
+  free (fn_copy);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
