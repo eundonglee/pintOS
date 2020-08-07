@@ -98,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       get_argument(ptr, arg, 2);
       check_address ((void *)arg[0]);
       check_address ((void *)arg[1]);
-      create(arg[0], (unsigned) atoi(*arg[1]));
+      create(arg[0], (unsigned) atoi(arg[1]));
       free(arg);
       break;
 
