@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <list.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -99,6 +100,33 @@ void argument_stack (char **parse, int count, void **esp)
   free(argv);
 }
 
+/* Return a child process descriptor */
+struct thread *get_child_process (int pid)
+{
+  struct thread *pt;     /* Parent thread */
+  struct thread *ct;     /* Child thread */
+  struct list cl;        /* Child thread list */
+  struct list_elem *e;   /* An element of child thread list */
+
+  pt = thread_current ();
+  cl = pt->child_list;
+  
+  for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e);)
+  {
+    ct = list_entry (e, struct thread, child_elem);
+    if (ct->tid == pid)
+      return ct;
+  }
+  return NULL;
+}
+
+/* Delete and free a child process */
+void remove_child_process (struct thread *cp)
+{
+  list_remove (& cp->child_elem);
+  palloc_free_page (cp); 
+}
+
 /* A thread function that loads a user process and starts it
    running. */
 static void
@@ -114,7 +142,8 @@ start_process (void *file_name_)
   char **parse;
   int count;
   struct intr_frame if_;
-  
+  struct thread *cp;  
+
   /* Tokenize FILE_NAME. */
   file_name_length = strlen(file_name);
   fn_copy = malloc((file_name_length+1) * sizeof(char));
@@ -147,10 +176,17 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (parse[0], &if_.eip, &if_.esp);
 
+  /* When child process load finished, continue parent process. */
+  cp = thread_current ();
+  sema_up (& cp->sema_load);
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
+    cp->load_done = false;
     thread_exit ();
+  else
+    cp->load_done = true;
 
   /* Save arguments on stack. */
   argument_stack(parse, count, &if_.esp);
@@ -179,7 +215,19 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  struct thread *ct;
+
+  ct = get_child_process (child_tid);
+  
+  /* When child_tid not found in child_list, return -1. */
+  if (ct == NULL)
+    return -1;
+
+  sema_down (& ct->exit_sema);
+
+  remove_child_process (ct);
+
+  return ct->exit_status;  
 }
 
 /* Free the current process's resources. */

@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include <list.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -167,6 +168,7 @@ thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
   struct thread *t;
+  struct thread *pt;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
@@ -205,6 +207,14 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   intr_set_level (old_level);
+
+  pt = thread_current (); /* Get pointer to parent thread. */
+  t->parent_thread = pt; /* Save parent thread. */  
+  t->load_done = false; /* The thread is not loaded. */
+  t->exit_done = false; /* The thread is not exit. */
+  sema_init (& t->sema_load, 0); /* Initialize sema_load as zero. */
+  sema_init (& t->sema_exit, 0); /* Initialize sema_exit as zero. */
+  list_push_back (& pt->child_list, & t->child_list_elem); /* Push back child thread into the child list of parent thread */
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -288,6 +298,8 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+  struct thread *t = thread_current ();
+
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
@@ -298,7 +310,11 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem);
+  list_remove (&t->allelem);
+
+  t->exit_done = true;
+  sema_up(& t->sema_exit);
+  
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -470,6 +486,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  list_init (& t->child_list);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -538,11 +556,14 @@ thread_schedule_tail (struct thread *prev)
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
+  /* Don't remove process descriptor. */
+  /* 
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
       palloc_free_page (prev);
     }
+  */
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and

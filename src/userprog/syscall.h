@@ -7,6 +7,7 @@
 void syscall_init (void);
 void halt (void);
 void exit (int status);
+void exec (const char *cmd_line);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 void check_address (void *addr);
