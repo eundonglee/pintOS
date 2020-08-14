@@ -1,12 +1,12 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 #include "userprog/process.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
@@ -29,11 +29,10 @@ void exit (int status)
 }
 
 /* Create a child thread and return thread ID of it. */
-void exec (const char *cmd_line)
+pid_t exec (const char *cmd_line)
 {
   pid_t cpid; /* ID of a child preocess */
   struct thread *cp;
-  bool success;
 
   cpid = process_execute (cmd_line);
   cp = get_child_process (cpid);
@@ -77,7 +76,7 @@ void check_address (void *addr)
 }
 
 /* Take arguments from stack */
-void get_argument (void *esp, char **arg, int count)
+void get_argument (void *esp, char *arg[], int count)
 {
   char *sp = esp;
 
@@ -108,7 +107,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   check_address ((void *)ptr);
   int syscall_number = *ptr;
-  char **arg;
+  char *arg[10];
 
   switch (syscall_number)
   {
@@ -121,35 +120,27 @@ syscall_handler (struct intr_frame *f UNUSED)
       break; 
 
     case SYS_EXEC:
-      arg = malloc (1);
       get_argument(ptr, arg, 1);
       check_address ((void *) arg[0]);
       f -> eax = exec ((const char *) arg[0]);
-      free(arg)
-      break
+      break;
 
     case SYS_WAIT:
-      arg = malloc (1);
       get_argument (ptr, arg, 1);
       check_address ((void *) arg[0]);
       f -> eax = wait ((tid_t) arg[0]);
-      free (arg);
 
     case SYS_CREATE:
-      arg = malloc(2);
       get_argument(ptr, arg, 2);
       check_address ((void *)arg[0]);
       check_address ((void *)arg[1]);
       f -> eax = create(arg[0], (unsigned) atoi(arg[1]));
-      free(arg);
       break;
 
     case SYS_REMOVE:
-      arg = malloc(1);
       get_argument(ptr, arg, 1);
       check_address ((void *)arg[0]);
       f -> eax = remove(arg[0]);
-      free(arg);
       break;
 
     default:

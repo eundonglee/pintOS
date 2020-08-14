@@ -18,7 +18,6 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -32,8 +31,8 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char *thread_name;
-  int thread_name_length;
+  int thread_name_length = strcspn(file_name, " ");
+  char thread_name[thread_name_length + 1];
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -43,27 +42,23 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Parse a string before the first whitespace. */
-  thread_name_length = strcspn(file_name, " ");
-  thread_name = malloc (thread_name_length + 1);
   strlcpy(thread_name, file_name, thread_name_length + 1);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (thread_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  free (thread_name);
   return tid;
 }
 
-void argument_stack (char **parse, int count, void **esp)
+void argument_stack (char *parse[], int count, void **esp)
 {
-  char **argv;
+  char *argv[count];
   int i, j, k;
   int argLength;
   int totalArgLength;
 
   /* Push arguments in stack  and save address in which arguments are pushed. */
-  argv = malloc(count * 4);
   totalArgLength = 0;
   for (i = count - 1 ; i > -1 ; i--)
   { 
@@ -96,8 +91,6 @@ void argument_stack (char **parse, int count, void **esp)
   /* Push return address */
   *esp = *esp - 4;
   ** (void ***)esp = 0;
-
-  free(argv);
 }
 
 /* Return a child process descriptor */
@@ -111,9 +104,9 @@ struct thread *get_child_process (int pid)
   pt = thread_current ();
   cl = pt->child_list;
   
-  for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e);)
+  for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e))
   {
-    ct = list_entry (e, struct thread, child_elem);
+    ct = list_entry (e, struct thread, child_list_elem);
     if (ct->tid == pid)
       return ct;
   }
@@ -123,7 +116,7 @@ struct thread *get_child_process (int pid)
 /* Delete and free a child process */
 void remove_child_process (struct thread *cp)
 {
-  list_remove (& cp->child_elem);
+  list_remove (& cp->child_list_elem);
   palloc_free_page (cp); 
 }
 
@@ -133,37 +126,26 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
+  int file_name_length = strlen(file_name);
+  char fn_copy[file_name_length+1];
   bool success;
-  char *fn_copy;
-  int file_name_length;
   char *token;
   char *save_ptr;
-  int parse_size;
-  char **parse;
+  char *parse[20];
   int count;
   struct intr_frame if_;
   struct thread *cp;  
 
   /* Tokenize FILE_NAME. */
-  file_name_length = strlen(file_name);
-  fn_copy = malloc((file_name_length+1) * sizeof(char));
   strlcpy(fn_copy, file_name, file_name_length+1);
 
   token = strtok_r(fn_copy, " ", &save_ptr);
-  parse_size = 5;
-  parse = malloc(parse_size * sizeof(char *));
   count = 0;
 
   int i = 0;
   while (token)
   { 
     count++;
-    /* Expand memory allocation if required. */
-    if (count > parse_size)
-    {
-      parse_size = parse_size + 5;
-      realloc(parse, parse_size * sizeof(char *));
-    }
     parse[i] = token;
     i++;
     token = strtok_r(NULL, " ", &save_ptr);
@@ -183,15 +165,17 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
+  {
     cp->load_done = false;
     thread_exit ();
+  }
   else
+  {
     cp->load_done = true;
-
-  /* Save arguments on stack. */
-  argument_stack(parse, count, &if_.esp);
-  free (parse);
-  free (fn_copy);
+    /* Save arguments on stack. */
+    argument_stack(parse, count, &if_.esp);
+    hex_dump(if_.esp, (uintptr_t) if_.esp, PHYS_BASE - if_.esp, true);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -223,7 +207,7 @@ process_wait (tid_t child_tid UNUSED)
   if (ct == NULL)
     return -1;
 
-  sema_down (& ct->exit_sema);
+  sema_down (& ct->sema_exit);
 
   remove_child_process (ct);
 
