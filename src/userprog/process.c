@@ -174,7 +174,7 @@ start_process (void *file_name_)
     cp->load_done = true;
     /* Save arguments on stack. */
     argument_stack(parse, count, &if_.esp);
-    hex_dump(if_.esp, (uintptr_t) if_.esp, PHYS_BASE - if_.esp, true);
+    hex_dump((uintptr_t) if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
   }
 
   /* Start the user process by simulating a return from an
@@ -220,6 +220,12 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  int fd;
+
+  for (fd = cur->fd_next - 1 ; fd >= 2 ; fd--)
+    process_close_file (fd);
+  
+  free (cur->fd_table);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -585,4 +591,38 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+/* Add file pointer to file descriptor table of the thread. */
+int process_add_file (struct file *f)
+{
+  struct thread *t = thread_current ();
+  int fd = t->fd_next;
+
+  t->fd_table[fd] = f;
+  t->fd_next = t->fd_next + 1;
+  
+  return fd;
+}
+
+/* Return file pointer from file descriptor table of the thread. */
+struct file *process_get_file (int fd)
+{
+  struct thread *t = thread_current ();
+  struct file *file_to_return = t->fd_table[fd];
+
+  if (!file_to_return)
+    return file_to_return;
+  else 
+    return NULL;
+}
+
+/* Close file and initialize the entry allocated to the file descriptor. */
+void process_close_file (int fd)
+{
+  struct thread *t = thread_current ();
+  struct file *f = process_get_file (fd);
+
+  file_close (f);
+  t->fd_table[fd] = NULL;
 }

@@ -9,9 +9,11 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "filesys/file.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -215,6 +217,9 @@ thread_create (const char *name, int priority,
   sema_init (& t->sema_load, 0); /* Initialize sema_load as zero. */
   sema_init (& t->sema_exit, 0); /* Initialize sema_exit as zero. */
   list_push_back (& pt->child_list, & t->child_list_elem); /* Push back child thread into the child list of parent thread */
+
+  t->fd_next = 2;
+  t->fd_table = malloc(20);
 
   /* Add to run queue. */
   thread_unblock (t);

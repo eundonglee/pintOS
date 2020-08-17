@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "threads/malloc.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -100,6 +102,9 @@ struct thread
     struct semaphore sema_load;         /* Semaphore for load */
     struct semaphore sema_exit;         /* Semaphore for exit */
     int exit_status;                    /* Exit status when called exit */
+
+    struct file **fd_table;                    /* File descriptor table */
+    int fd_next;                        /* Next index of file descriptor table */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
