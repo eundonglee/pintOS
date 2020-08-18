@@ -103,8 +103,9 @@ struct thread
     struct semaphore sema_exit;         /* Semaphore for exit */
     int exit_status;                    /* Exit status when called exit */
 
-    struct file **fd_table;                    /* File descriptor table */
+    struct file **fd_table;             /* File descriptor table */
     int fd_next;                        /* Next index of file descriptor table */
+    struct file *run_file;              /* File currently run by the thread. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

@@ -26,6 +26,6 @@ void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
 void check_address (void *addr);
-void get_argument (void *esp, char **arg, int count);
+void get_argument (void *esp, int arg[], int count);
 
 #endif /* userprog/syscall.h */
