@@ -175,7 +175,6 @@ start_process (void *file_name_)
     cp->load_done = true;
     /* Save arguments on stack. */
     argument_stack(parse, count, &if_.esp);
-    hex_dump((uintptr_t) if_.esp, if_.esp, PHYS_BASE - if_.esp, true);
   }
 
   /* Start the user process by simulating a return from an
@@ -201,6 +200,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   struct thread *ct;
+  int exit_status;
 
   ct = get_child_process (child_tid);
   
@@ -209,10 +209,11 @@ process_wait (tid_t child_tid UNUSED)
     return -1;
 
   sema_down (& ct->sema_exit);
-
+  
+  exit_status = ct->exit_status;
   remove_child_process (ct);
 
-  return ct->exit_status;  
+  return exit_status;  
 }
 
 /* Free the current process's resources. */

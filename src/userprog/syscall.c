@@ -136,9 +136,8 @@ int write (int fd, void *buffer, unsigned size)
     actual_size = file_write (f, buffer, size);
   }
 
-  printf("Write done\n");
   lock_release (& filesys_lock);
-  printf("Lock released\n");
+
   return actual_size;
 }
 
@@ -184,7 +183,6 @@ void get_argument (void *esp, int arg[], int count)
   for (i = 0; i < count; i++)
   {
     sp = sp + 1;
-    printf("0x%x\n%d\n", sp, *sp);
     arg[i] = *sp;
   }
 }
@@ -200,10 +198,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-
-  hex_dump((uintptr_t)(*f).esp, (*f).esp, PHYS_BASE - (*f).esp, true);
-
   int *ptr = f -> esp;
 
   check_address ((void *)ptr);
@@ -223,68 +217,63 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXEC:
       get_argument (ptr, arg, 1);
       check_address ((void *) arg[0]);
-      f -> eax = exec (arg[0]);
+      f -> eax = exec ((char *) arg[0]);
       break;
 
     case SYS_WAIT:
       get_argument (ptr, arg, 1);
-      check_address ((void *) arg[0]);
       f -> eax = wait ((tid_t) arg[0]);
+      break;
 
     case SYS_CREATE:
       get_argument (ptr, arg, 2);
       check_address ((void *) arg[0]);
-      check_address ((void *) arg[1]);
       f -> eax = create ((char *) arg[0], (unsigned) arg[1]);
       break;
 
     case SYS_REMOVE:
       get_argument (ptr, arg, 1);
-      check_address ((void *)arg[0]);
+      check_address ((void *) arg[0]);
       f -> eax = remove ((char *) arg[0]);
       break;
 
     case SYS_OPEN:
       get_argument (ptr, arg, 1);
-      check_address ((void *)arg[0]);
+      check_address ((void *) arg[0]);
       f -> eax = open ((char *) arg[0]);
       break;
 
     case SYS_FILESIZE:
       get_argument (ptr, arg, 1);
-      check_address ((void *)arg[0]);
       f -> eax = filesize (arg[0]);
       break;
 
     case SYS_READ:
       get_argument (ptr, arg, 3);
-      check_address ((void *)arg[0]);
-      check_address ((void *)arg[1]);
-      check_address ((void *)arg[2]);
+      check_address ((void *) arg[1]);
       f -> eax = read (arg[0], (void *)arg[1], (unsigned)arg[2]);
+      break;
 
     case SYS_WRITE:
       get_argument (ptr, arg, 3);
-      check_address ((void *)arg[0]);
-      check_address ((void *)arg[1]);
-      check_address ((void *)arg[2]);
+      check_address ((void *) arg[1]);
       f -> eax = write (arg[0], (void *)arg[1], (unsigned)arg[2]);
+      break;
 
     case SYS_SEEK:
       get_argument (ptr, arg, 2);
-      check_address ((void *)arg[0]);
-      check_address ((void *)arg[1]);
-      seek (arg[0], (unsigned) arg[1]);
+      seek (arg[0], (unsigned) &arg[1]);
+      break;
 
     case SYS_TELL:
       get_argument (ptr, arg, 1);
-      check_address ((void *)arg[0]);
       f -> eax = tell (arg[0]);
+      break;
 
     case SYS_CLOSE:
       get_argument (ptr, arg, 1);
-      check_address ((void *)arg[0]);
       close (arg[0]);
+      break;
 
     default:
       thread_exit();
