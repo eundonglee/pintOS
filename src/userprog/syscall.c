@@ -110,9 +110,8 @@ int read (int fd, void *buffer, unsigned size)
   }
 
   else 
-  {
     actual_size = file_read (f, buffer, size);
-  }
+
   lock_release (& filesys_lock);
   return actual_size;
 }
@@ -203,6 +202,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   check_address ((void *)ptr);
   int syscall_number = *ptr;
   int arg[10];
+
+  //`printf("syscall_number : %d\n", syscall_number);
 
   switch (syscall_number)
   {

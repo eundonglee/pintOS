@@ -625,9 +625,13 @@ int process_add_file (struct file *f)
   struct thread *t = thread_current ();
   int fd = t->fd_next;
 
+  /* Daynamically allocate memory to file descriptor table. */
+  if (fd % 20  == 0)
+    realloc (t->fd_table, sizeof(struct file *)*(fd+20));
+
   t->fd_table[fd] = f;
   t->fd_next = t->fd_next + 1;
-  
+
   return fd;
 }
 
@@ -637,7 +641,7 @@ struct file *process_get_file (int fd)
   struct thread *t = thread_current ();
   struct file *file_to_return = t->fd_table[fd];
 
-  if (!file_to_return)
+  if (file_to_return != NULL)
     return file_to_return;
   else 
     return NULL;
