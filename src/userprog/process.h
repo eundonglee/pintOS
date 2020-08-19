@@ -4,6 +4,7 @@
 #include "threads/thread.h"
 #include "filesys/file.h"
 
+int token_count (char *string);
 tid_t process_execute (const char *file_name);
 void argument_stack (char *parse[], int count, void **esp);
 struct thread *get_child_process (int pid); 

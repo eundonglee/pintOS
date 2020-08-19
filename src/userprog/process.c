@@ -23,6 +23,27 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+/* Count how many tokens are in string. */
+int token_count (char *string)
+{
+  int string_length = strlen (string);
+  char str_copy [string_length + 1];
+  char *save_ptr; 
+  char *token;
+  int count;
+
+  strlcpy (str_copy, string, string_length + 1);
+  token = strtok_r (str_copy, " ", &save_ptr);
+  count = 0;
+  while (token)
+  {
+    count++;
+    token = strtok_r (NULL, " ", &save_ptr);
+  }
+
+  return count;
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -132,8 +153,8 @@ start_process (void *file_name_)
   bool success;
   char *token;
   char *save_ptr;
-  char *parse[20];
-  int count;
+  int arg_count = token_count (file_name);
+  char *parse[arg_count];
   struct intr_frame if_;
   struct thread *cp;  
 
@@ -141,12 +162,10 @@ start_process (void *file_name_)
   strlcpy(fn_copy, file_name, file_name_length+1);
 
   token = strtok_r(fn_copy, " ", &save_ptr);
-  count = 0;
 
   int i = 0;
   while (token)
   { 
-    count++;
     parse[i] = token;
     i++;
     token = strtok_r(NULL, " ", &save_ptr);
@@ -174,7 +193,7 @@ start_process (void *file_name_)
   {
     cp->load_done = true;
     /* Save arguments on stack. */
-    argument_stack(parse, count, &if_.esp);
+    argument_stack(parse, arg_count, &if_.esp);
   }
 
   /* Start the user process by simulating a return from an
