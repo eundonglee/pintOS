@@ -126,19 +126,23 @@ struct thread *get_child_process (int pid)
   pt = thread_current ();
   cl = pt->child_list;
   
-  for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e))
+  if (list_begin (&cl) -> next != NULL)
   {
-    ct = list_entry (e, struct thread, child_list_elem);
-    if (ct->tid == pid)
-      return ct;
+    for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e))
+    { 
+      ct = list_entry (e, struct thread, child_list_elem);
+      if (ct->tid == pid)
+        return ct;
+    }
   }
+
   return NULL;
 }
 
 /* Delete and free a child process */
 void remove_child_process (struct thread *cp)
 {
-  list_remove (& cp->child_list_elem);
+  list_remove (& cp -> child_list_elem);
   palloc_free_page (cp); 
 }
 
@@ -222,13 +226,13 @@ process_wait (tid_t child_tid UNUSED)
   int exit_status;
 
   ct = get_child_process (child_tid);
-  
+
   /* When child_tid not found in child_list, return -1. */
   if (ct == NULL)
     return -1;
 
   sema_down (& ct->sema_exit);
-  
+
   exit_status = ct->exit_status;
   remove_child_process (ct);
 

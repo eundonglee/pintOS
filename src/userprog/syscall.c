@@ -24,6 +24,7 @@ void halt (void)
 void exit (int status)
 {
   struct thread *t = thread_current ();
+
   t->exit_status = status;
   printf ("%s: exit(%d)\n", t->name, t->exit_status);
   thread_exit();
@@ -49,8 +50,16 @@ pid_t exec (const char *cmd_line)
 /* Wait until the child process exits */
 int wait (tid_t tid)
 {
-  int status = process_wait(tid);
-  return status;
+  struct thread *t = thread_current ();
+
+  if (t->status == THREAD_BLOCKED)
+    return -1;
+
+  else
+  {
+    int status = process_wait(tid);
+    return status;
+  }
 }
 
 /* Create file and return the result. */
@@ -131,12 +140,9 @@ int write (int fd, void *buffer, unsigned size)
   }
 
   else 
-  {
     actual_size = file_write (f, buffer, size);
-  }
 
   lock_release (& filesys_lock);
-
   return actual_size;
 }
 
@@ -161,7 +167,10 @@ unsigned tell (int fd)
 /* Close the file. */
 void close (int fd)
 {
-  process_close_file (fd);
+  if (fd < 2)
+    exit (-1);
+  else
+    process_close_file (fd);
 }
 
 /* Check whether the address is in user space. If the address is outside user space, exit the thread */
@@ -203,7 +212,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   int syscall_number = *ptr;
   int arg[10];
 
-  //`printf("syscall_number : %d\n", syscall_number);
+  // printf("syscall_number : %d\n", syscall_number);
+  //hex_dump ((uintptr_t) ptr, ptr, 48, true);   
 
   switch (syscall_number)
   {
@@ -224,7 +234,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f -> eax = exec ((char *) arg[0]);
       break;
 
-    case SYS_WAIT:    
+    case SYS_WAIT:     
       check_address ((void *) (ptr + 1));
       get_argument (ptr, arg, 1);
       f -> eax = wait ((tid_t) arg[0]);
