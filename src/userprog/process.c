@@ -120,20 +120,17 @@ struct thread *get_child_process (int pid)
 {
   struct thread *pt;     /* Parent thread */
   struct thread *ct;     /* Child thread */
-  struct list cl;        /* Child thread list */
+  struct list *cl;        /* Child thread list */
   struct list_elem *e;   /* An element of child thread list */
 
   pt = thread_current ();
-  cl = pt->child_list;
-  
-  if (list_begin (&cl) -> next != NULL)
-  {
-    for (e = list_begin (&cl); e != list_end (&cl); e = list_next (e))
-    { 
-      ct = list_entry (e, struct thread, child_list_elem);
-      if (ct->tid == pid)
-        return ct;
-    }
+  cl = &pt->child_list;
+
+  for (e = list_begin (cl); e != list_end (cl); e = list_next (e))
+  { 
+    ct = list_entry (e, struct thread, child_list_elem);
+    if (ct->tid == pid)
+      return ct;
   }
 
   return NULL;
