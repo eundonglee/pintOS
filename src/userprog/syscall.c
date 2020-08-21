@@ -49,17 +49,9 @@ pid_t exec (const char *cmd_line)
 
 /* Wait until the child process exits */
 int wait (tid_t tid)
-{
-  struct thread *t = thread_current ();
-
-  if (t->status == THREAD_BLOCKED)
-    return -1;
-
-  else
-  {
-    int status = process_wait(tid);
-    return status;
-  }
+{ 
+  int status = process_wait(tid);
+  return status;
 }
 
 /* Create file and return the result. */
@@ -167,10 +159,7 @@ unsigned tell (int fd)
 /* Close the file. */
 void close (int fd)
 {
-  if (fd < 2)
-    exit (-1);
-  else
-    process_close_file (fd);
+  process_close_file (fd);
 }
 
 /* Check whether the address is in user space. If the address is outside user space, exit the thread */
@@ -212,7 +201,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   int syscall_number = *ptr;
   int arg[10];
 
-  // printf("syscall_number : %d\n", syscall_number);
+  //printf("syscall_number : %d\n", syscall_number);
   //hex_dump ((uintptr_t) ptr, ptr, 48, true);   
 
   switch (syscall_number)
@@ -284,7 +273,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_SEEK:
       check_address ((void *) (ptr + 2));
       get_argument (ptr, arg, 2);
-      seek (arg[0], (unsigned) &arg[1]);
+      seek (arg[0], (unsigned) arg[1]);
       break;
 
     case SYS_TELL:

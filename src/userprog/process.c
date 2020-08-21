@@ -244,11 +244,12 @@ process_exit (void)
   uint32_t *pd;
   int fd;
 
-  for (fd = cur->fd_next - 1 ; fd >= 2 ; fd--)
+  for (fd = (cur->fd_next) - 1 ; fd >= 2 ; fd--)
     process_close_file (fd);
   
   free (cur->fd_table);
 
+  file_close (cur->run_file);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -382,7 +383,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       goto done; 
     }
   t->run_file = file;
-  file_deny_write (file);
+  file_deny_write (file);  
   lock_release (& filesys_lock);
 
   /* Read and verify executable header. */
@@ -468,7 +469,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  /* Do not close file until porcess exit */
   return success;
 }
 
@@ -640,10 +641,10 @@ int process_add_file (struct file *f)
 struct file *process_get_file (int fd)
 {
   struct thread *t = thread_current ();
-  struct file *file_to_return = t->fd_table[fd];
 
-  if (file_to_return != NULL)
-    return file_to_return;
+  if (1 < fd && fd < t->fd_next)
+    return t -> fd_table[fd];
+
   else 
     return NULL;
 }
@@ -652,8 +653,12 @@ struct file *process_get_file (int fd)
 void process_close_file (int fd)
 {
   struct thread *t = thread_current ();
-  struct file *f = process_get_file (fd);
+  struct file *f;
 
-  file_close (f);
-  t->fd_table[fd] = NULL;
+  if (1 < fd && fd < t->fd_next)
+  {
+    f = process_get_file (fd);
+    file_close (f);
+    t -> fd_table[fd] = NULL;
+  }
 }
