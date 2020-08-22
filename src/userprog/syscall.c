@@ -38,6 +38,7 @@ pid_t exec (const char *cmd_line)
 
   cpid = process_execute (cmd_line);
   cp = get_child_process (cpid);
+
   sema_down(& cp->sema_load);
 
   /* If the child process load failed, return -1. */
@@ -50,7 +51,9 @@ pid_t exec (const char *cmd_line)
 /* Wait until the child process exits */
 int wait (tid_t tid)
 { 
+  //printf ("tid : %d wait start \n", thread_current () ->tid);
   int status = process_wait(tid);
+  //printf ("tid : %d wait done \n", thread_current () ->tid);
   return status;
 }
 
@@ -71,12 +74,20 @@ bool remove (const char *file)
 /* Open file and return file descriptor index. */
 int open (const char *file)
 {  
-  struct file *f = filesys_open (file);
-  
+  struct file *f;
+  lock_acquire (& filesys_lock);
+
+  f = filesys_open (file);  
   if (f != NULL)
+  {
+    lock_release (& filesys_lock);
     return process_add_file (f);
+  }
   else
+  {
+    lock_release (& filesys_lock);
     return -1;
+  }
 }
 
 /* Return file size. */
@@ -110,8 +121,14 @@ int read (int fd, void *buffer, unsigned size)
     } 
   }
 
-  else 
+  else if (f != NULL) 
     actual_size = file_read (f, buffer, size);
+
+  else
+  {
+    lock_release (& filesys_lock);
+    return -1;
+  }
 
   lock_release (& filesys_lock);
   return actual_size;
@@ -131,8 +148,14 @@ int write (int fd, void *buffer, unsigned size)
     actual_size = size;
   }
 
-  else 
+  else if (f != NULL) 
     actual_size = file_write (f, buffer, size);
+
+  else
+  {
+    lock_release (& filesys_lock);
+    return -1;
+  }
 
   lock_release (& filesys_lock);
   return actual_size;
@@ -202,7 +225,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   int arg[10];
 
   //printf("syscall_number : %d\n", syscall_number);
-  //hex_dump ((uintptr_t) ptr, ptr, 48, true);   
+  //hex_dump ((uintptr_t) ptr, ptr, 24, true);   
 
   switch (syscall_number)
   {

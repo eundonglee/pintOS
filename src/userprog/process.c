@@ -181,21 +181,16 @@ start_process (void *file_name_)
 
   /* When child process load finished, continue parent process. */
   cp = thread_current ();
+  cp -> load_done = success;
   sema_up (& cp->sema_load);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
-  {
-    cp->load_done = false;
     thread_exit ();
-  }
+  /* Save arguments on stack. */
   else
-  {
-    cp->load_done = true;
-    /* Save arguments on stack. */
     argument_stack(parse, arg_count, &if_.esp);
-  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
