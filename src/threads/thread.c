@@ -219,7 +219,7 @@ thread_create (const char *name, int priority,
   list_push_back (& pt->child_list, & t->child_list_elem); /* Push back child thread into the child list of parent thread */
 
   t->fd_next = 2;
-  t->fd_table = malloc(sizeof(struct file *) * 20);
+  t->fd_table = malloc(sizeof(struct file *) * 128);
 
   /* Add to run queue. */
   thread_unblock (t);

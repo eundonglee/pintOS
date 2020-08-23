@@ -51,9 +51,7 @@ pid_t exec (const char *cmd_line)
 /* Wait until the child process exits */
 int wait (tid_t tid)
 { 
-  //printf ("tid : %d wait start \n", thread_current () ->tid);
   int status = process_wait(tid);
-  //printf ("tid : %d wait done \n", thread_current () ->tid);
   return status;
 }
 
@@ -81,7 +79,7 @@ int open (const char *file)
   if (f != NULL)
   {
     lock_release (& filesys_lock);
-    return process_add_file (f);
+    return process_add_file (f); 
   }
   else
   {
