@@ -52,24 +52,35 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *thread_name;
+  char *save_ptr;
   tid_t tid;
-  int thread_name_length = strcspn(file_name, " ");
-  char thread_name[thread_name_length + 1];
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
+  thread_name = palloc_get_page (0);
   if (fn_copy == NULL)
+  {
+    if (thread_name) palloc_free_page (thread_name);
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  }
+  if (thread_name == NULL)
+  {
+    if (fn_copy) palloc_free_page (fn_copy);
+    return TID_ERROR;
+  }
 
+  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (thread_name, file_name, PGSIZE);
   /* Parse a string before the first whitespace. */
-  strlcpy(thread_name, file_name, thread_name_length + 1);
+  thread_name = strtok_r (thread_name, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (thread_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
+  if (tid == TID_ERROR) palloc_free_page (fn_copy);
+  if (thread_name) palloc_free_page (thread_name);
+   
   return tid;
 }
 
