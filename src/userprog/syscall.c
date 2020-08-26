@@ -76,6 +76,7 @@ int open (const char *file)
   lock_acquire (& filesys_lock);
 
   f = filesys_open (file);  
+
   if (f != NULL)
   {
     lock_release (& filesys_lock);

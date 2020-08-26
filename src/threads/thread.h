@@ -107,6 +107,8 @@ struct thread
     int fd_next;                        /* Next index of file descriptor table */
     struct file *run_file;              /* File currently run by the thread. */
 
+    int64_t wakeup_ticks;               /* Wake up the thread when ticks are larger than wakeup_ticks */
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -154,5 +156,10 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void update_next_ticks_to_wake (int64_t ticks);
+int64_t get_next_ticks_to_wake (void);
+void thread_sleep (int64_t ticks);
+void thread_wake (int64_t ticks);
 
 #endif /* threads/thread.h */

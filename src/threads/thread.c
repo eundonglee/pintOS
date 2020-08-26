@@ -27,6 +27,12 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of sleeping threads (In order to avoid busy-waiting) */
+static struct list sleep_list;
+
+/* Minimum wakeup_tick of the threads in sleep_list */
+int64_t next_ticks_to_wake = INT64_MAX;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -71,7 +77,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
-void thread_schedule_tail (struct thread *prev);
+void thread_schedule_tail (void);
 static tid_t allocate_tid (void);
 
 /* Initializes the threading system by transforming the code
@@ -94,6 +100,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -540,7 +547,7 @@ next_thread_to_run (void)
    After this function and its caller returns, the thread switch
    is complete. */
 void
-thread_schedule_tail (struct thread *prev)
+thread_schedule_tail (void)
 {
   struct thread *cur = running_thread ();
   
@@ -562,7 +569,7 @@ thread_schedule_tail (struct thread *prev)
      pull out the rug under itself.  (We don't free
      initial_thread because its memory was not obtained via
      palloc().) */
-  /* Don't remove process descriptor. */
+  /* Don't remove process descriptor here! It will be removed in process_wait () in process.c. */
   /* 
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
@@ -592,7 +599,7 @@ schedule (void)
 
   if (cur != next)
     prev = switch_threads (cur, next);
-  thread_schedule_tail (prev);
+  thread_schedule_tail ();
 }
 
 /* Returns a tid to use for a new thread. */
@@ -612,3 +619,57 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* Update next_ticks_to_wake to become the minimum. */
+void update_next_ticks_to_wake (int64_t ticks)
+{
+  next_ticks_to_wake = (next_ticks_to_wake <= ticks)?next_ticks_to_wake:ticks;
+}
+
+/* Return next_tick_to_wake */
+int64_t get_next_ticks_to_wake (void)
+{
+  return next_ticks_to_wake;
+}
+
+/* Change status of the thread to 'blocked' and move the thread from ready_list to sleep_list.*/ 
+void thread_sleep (int64_t ticks)
+{
+  struct thread *cur;
+  enum intr_level old_level;
+
+  old_level = intr_disable ();
+  cur = thread_current ();
+  ASSERT (cur != idle_thread)
+  
+  list_push_back (& sleep_list, & cur->elem);
+  cur -> wakeup_ticks = ticks;
+  update_next_ticks_to_wake (ticks); 
+  thread_block ();
+   
+  intr_set_level (old_level);
+}
+
+/* Wake up the sleeping threads */
+void thread_wake (int64_t ticks)
+{
+  struct list_elem *se;     /* Sleep list element */
+  struct thread *st;        /* Sleeping thread */
+
+  next_ticks_to_wake = INT64_MAX;
+
+  for (se = list_begin (&sleep_list); se != list_end (&sleep_list);)
+  {
+    st = list_entry (se, struct thread, elem);
+    if (st->wakeup_ticks <= ticks)
+    {
+      se = list_remove (se);
+      thread_unblock (st);
+    }
+    else
+    {
+      se = list_next (se);
+      update_next_ticks_to_wake (st->wakeup_ticks);
+    }
+  }
+}
