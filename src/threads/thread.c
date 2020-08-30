@@ -413,7 +413,11 @@ bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *a
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *t = thread_current ();
+
+  t->priority =  t->init_priority = new_priority;
+
+  refresh_priority ();
 
   test_max_priority (); 
 }
@@ -539,11 +543,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  t->priority = t->init_priority = priority;
   t->magic = THREAD_MAGIC;
+  t->wait_on_lock = NULL;
   list_push_back (&all_list, &t->allelem);
 
   list_init (& t->child_list);
+  list_init (& t->donations);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -715,4 +721,58 @@ void thread_wake (int64_t ticks)
       update_next_ticks_to_wake (st->wakeup_ticks);
     }
   }
+}
+
+/* Donate priority from waiting threads to the thread holding lock */
+void donate_priority (void)
+{
+  struct thread *t = thread_current ();
+  struct thread *h;
+  struct lock *l;
+
+  int depth = 0;
+  for (l = t->wait_on_lock; l != NULL && depth < 8; l = h->wait_on_lock)
+  {
+	h = l->holder;
+	h->priority = t->priority > h->priority ? t->priority : h->priority;
+	depth++;
+  }
+}
+
+/* When lock is released, remove the threads waiting for the lock from donations list. */
+void remove_with_lock (struct lock *lock)
+{
+  struct thread *h = thread_current ();
+  struct thread *t;
+  struct list *d = & h -> donations;
+  struct list_elem *e;
+
+  if (!list_empty (d))
+  { 
+	e = list_begin (d);
+	while (e != list_end (d))
+	{
+	  t = list_entry (e, struct thread, donation_elem);
+	  if (t->wait_on_lock == lock)
+		e = list_remove (e);
+	  else
+		e = list_next (e);
+	}
+  }	
+}
+
+/* When priorities of threads were changed, refresh donation of priority. */
+void refresh_priority (void)
+{
+  struct thread *t = thread_current ();
+  struct thread *d;
+  struct list_elem *e;
+  int p = t->init_priority;
+
+  for (e = list_begin (&t->donations); e != list_end (&t->donations); e = list_next (e))
+  {
+	d = list_entry (e, struct thread, donation_elem);
+	p = d->priority > p ? d->priority : p;
+  }
+  t->priority = p;
 }

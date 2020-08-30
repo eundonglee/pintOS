@@ -90,7 +90,7 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
+    int priority;                       /* Priority. */	
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct thread *parent_thread;       /* Pointer to thread that created this tread */
@@ -102,6 +102,11 @@ struct thread
     struct semaphore sema_load;         /* Semaphore for load */
     struct semaphore sema_exit;         /* Semaphore for exit */
     int exit_status;                    /* Exit status when called exit */
+
+	int init_priority;					/* Save initial priority to restore when donation finished */
+	struct lock *wait_on_lock;          /* Lock awaited by the thread */
+	struct list donations;              /* List of threads donating priority to the thread */
+	struct list_elem donation_elem;     /* List element for donations list */
 
     struct file **fd_table;             /* File descriptor table */
     int fd_next;                        /* Next index of file descriptor table */
@@ -163,5 +168,9 @@ void update_next_ticks_to_wake (int64_t ticks);
 int64_t get_next_ticks_to_wake (void);
 void thread_sleep (int64_t ticks);
 void thread_wake (int64_t ticks);
+
+void donate_priority (void);
+void remove_with_lock (struct lock *lock);
+void refresh_priority (void);
 
 #endif /* threads/thread.h */
