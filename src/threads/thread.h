@@ -97,18 +97,21 @@ struct thread
     struct list_elem child_list_elem;   /* List element for child thread list */
     struct list child_list;             /* List of child threads */
 
+	int init_priority;					/* Save initial priority to restore when donation finished */
+	struct lock *wait_on_lock;          /* Lock awaited by the thread */
+	struct list donations;              /* List of threads donating priority to the thread */
+	struct list_elem donation_elem;     /* List element for donations list */
+
+	int nice;                           /* The higher nice is, the faster the priority decrements */
+	int recent_cpu;                     /* Recent time during which the thread occupied CPU */
+
     bool load_done;                     /* Show whether this thread is loaded on memory or not */
     bool exit_done;                     /* Show whether this thread is exit or not */
     struct semaphore sema_load;         /* Semaphore for load */
     struct semaphore sema_exit;         /* Semaphore for exit */
     int exit_status;                    /* Exit status when called exit */
 
-	int init_priority;					/* Save initial priority to restore when donation finished */
-	struct lock *wait_on_lock;          /* Lock awaited by the thread */
-	struct list donations;              /* List of threads donating priority to the thread */
-	struct list_elem donation_elem;     /* List element for donations list */
-
-    struct file **fd_table;             /* File descriptor table */
+	struct file **fd_table;             /* File descriptor table */
     int fd_next;                        /* Next index of file descriptor table */
     struct file *run_file;              /* File currently run by the thread. */
 
@@ -163,6 +166,12 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void mlfqs_priority (struct thread *t);
+void mlfqs_recent_cpu (struct thread *t);
+void mlfqs_load_avg (void);
+void mlfqs_increment (void);
+void mlfqs_recalc (void);
 
 void update_next_ticks_to_wake (int64_t ticks);
 int64_t get_next_ticks_to_wake (void);

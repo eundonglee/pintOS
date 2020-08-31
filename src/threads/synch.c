@@ -211,7 +211,7 @@ lock_acquire (struct lock *lock)
   t = thread_current ();
   h = lock -> holder;
   /* Save initial priority of the lock holder and give donation to the holder. */
-  if (h != NULL)
+  if (h != NULL && thread_mlfqs != true)
   {
 	t->wait_on_lock = lock;
 	list_push_back (&h->donations, &t->donation_elem);
@@ -253,9 +253,12 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  
+ 
+  if (thread_mlfqs != true)
+  {
   remove_with_lock (lock);
   refresh_priority (); 
+  }
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
