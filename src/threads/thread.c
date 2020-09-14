@@ -236,6 +236,7 @@ thread_create (const char *name, int priority,
   t->fd_next = 2;
   t->fd_table = malloc(sizeof(struct file *) * 128);
 
+  //printf ("  thread 0x%x %s(parent : %s) created!\n", t, t->name, pt->name);
   /* Add to run queue. */
   thread_unblock (t);
   
@@ -663,11 +664,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->wait_on_lock = NULL;
   t->nice = NICE_DEFAULT;
   t->recent_cpu = RECENT_CPU_DEFAULT;
+  t->mapid_next = 0;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
   list_init (& t->child_list);
   list_init (& t->donations);
+  list_init (& t->mmap_list);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -852,6 +855,7 @@ void donate_priority (void)
   for (l = t->wait_on_lock; l != NULL && depth < 8; l = h->wait_on_lock)
   {
 	h = l->holder;
+	if (h == NULL) return;
 	h->priority = t->priority > h->priority ? t->priority : h->priority;
 	depth++;
   }

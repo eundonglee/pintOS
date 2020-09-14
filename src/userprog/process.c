@@ -19,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -91,7 +92,7 @@ void argument_stack (char *parse[], int count, void **esp)
   int argLength;
   int totalArgLength;
 
-  /* Push arguments in stack  and save address in which arguments are pushed. */
+  /* Push arguments into stack and save address in which arguments are pushed. */
   totalArgLength = 0;
   for (i = count - 1 ; i > -1 ; i--)
   { 
@@ -168,7 +169,7 @@ start_process (void *file_name_)
   int arg_count = token_count (file_name);
   char *parse[arg_count];
   struct intr_frame if_;
-  struct thread *cp;  
+  struct thread *cp = thread_current ();  
 
   /* Tokenize FILE_NAME. */
   strlcpy(fn_copy, file_name, file_name_length+1);
@@ -183,6 +184,9 @@ start_process (void *file_name_)
     token = strtok_r(NULL, " ", &save_ptr);
   }
 
+  /* Initialize the virtual memory hash table of the child thread. */
+  vm_init (& cp->vm);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -191,7 +195,6 @@ start_process (void *file_name_)
   success = load (parse[0], &if_.eip, &if_.esp);
 
   /* When child process load finished, continue parent process. */
-  cp = thread_current ();
   cp -> load_done = success;
   sema_up (& cp->sema_load);
 
@@ -247,6 +250,7 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+  struct mmap_file *mmf;
   uint32_t *pd;
   int fd;
 
@@ -256,6 +260,16 @@ process_exit (void)
   free (cur->fd_table);
 
   file_close (cur->run_file);
+
+  struct list_elem *e = list_begin (& cur->mmap_list);
+  while (e != list_end (& cur->mmap_list))
+  {
+	mmf = list_entry (e, struct mmap_file, elem);
+	e = list_remove (e);
+	do_munmap (mmf);
+  }
+
+  vm_destroy (& cur->vm);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -560,29 +574,44 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+/*      uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
-
+*/
       /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+/*      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
+*/
       /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
+/*      if (!install_page (upage, kpage, writable)) 
         {
           palloc_free_page (kpage);
           return false; 
         }
+*/
+
+	  /* Set the member values in vm_entry and insert it into vm hash table. */
+	  struct vm_entry *vme = malloc (sizeof (struct vm_entry));
+	  vme->type = VM_BIN;
+	  vme->vaddr = (void *) upage;
+	  vme->writable = writable;
+	  vme->is_loaded = false;
+	  vme->file = file;
+	  vme->offset = ofs;
+	  vme->read_bytes = page_read_bytes;
+	  vme->zero_bytes = page_zero_bytes;
+	  insert_vme (& thread_current ()->vm, vme);
+	  //printf ("vme : 0x%x, vaddr : 0x%x, file : 0x%x, writable : %d\n", vme, vme->vaddr, file, vme->writable);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
+	  ofs += page_read_bytes;
+	  upage += PGSIZE;
     }
   return true;
 }
@@ -596,6 +625,7 @@ setup_stack (void **esp)
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -604,6 +634,16 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+
+  /* Initailize the vm_entry and insert it into the vm hash table. */
+  struct vm_entry *vme = malloc (sizeof (struct vm_entry));
+  vme->type = VM_ANON;
+  vme->vaddr = (void *) (((uint8_t *) PHYS_BASE) - PGSIZE);
+  vme->writable = true;
+  vme->is_loaded = true;
+  //printf ("vme set : 0x%x, vaddr : 0x%x\n", vme, vme->vaddr);
+  insert_vme (& thread_current ()->vm, vme);
+
   return success;
 }
 
@@ -663,4 +703,66 @@ void process_close_file (int fd)
     file_close (f);
     t -> fd_table[fd] = NULL;
   }
+}
+
+/* Remove vm entries, page table entries, and ,if dirty bit is 1, save the change to the disk. */
+void do_munmap (struct mmap_file *mmf)
+{
+  struct list *vme_list = &mmf->vme_list;
+  struct vm_entry *vme;
+  void *vaddr;
+  struct file *file = mmf->file;
+
+  struct list_elem *e = list_begin (vme_list); 
+  while (e != list_end (vme_list))
+  {
+	vme = list_entry (e, struct vm_entry, mmap_elem);
+	vaddr = vme->vaddr;
+	if (pagedir_is_dirty (thread_current ()->pagedir, vaddr))
+	{
+	  lock_acquire (&filesys_lock);
+	  file_write_at (file, vaddr, vme->read_bytes, vme->offset);
+	  lock_release (&filesys_lock);
+	}
+	e = list_remove (e);
+	delete_vme (& thread_current ()->vm, vme);
+	free (vme);
+	pagedir_clear_page (thread_current ()->pagedir, vaddr);
+	palloc_free_page (pagedir_get_page(thread_current ()->pagedir, vaddr));
+  }
+
+  free (mmf);
+  file_close (file);
+}
+
+bool handle_mm_fault (struct vm_entry *vme)
+{
+  void *kaddr = palloc_get_page (PAL_USER);
+  bool success = false;
+  if (kaddr == NULL) return false;
+ 
+  //printf ("load vme : 0x%x, type : %d\n", vme, vme->type);
+  switch (vme->type)
+  {
+	case VM_BIN:
+	  success = load_file (kaddr, vme);
+	  break;
+	
+	case VM_FILE:
+	  success = load_file (kaddr, vme);
+	  break;
+
+	case VM_ANON:
+	  break;
+
+	default:
+	  return false;
+	  break;
+  }
+  if (success)
+	install_page (vme->vaddr, kaddr, vme->writable);
+  else
+	palloc_free_page (kaddr);
+  //printf ("installed(success : %d) vaddr:0x%x, kaddr:0x%x, writable:%d\n",  success, vme->vaddr, kaddr, vme->writable);
+  return success;
 }

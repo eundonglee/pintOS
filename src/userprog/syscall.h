@@ -1,6 +1,6 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
-#define USER_LIMIT ((void *) 0x8048000)
+#define USER_LIMIT ((void *) 0x08048000)
 
 #include <stdbool.h>
 #include "threads/thread.h"
@@ -25,7 +25,12 @@ int write (int fd, void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+int mmap (int fd, void *addr);
+void munmap (int mapping);
 void check_address (void *addr);
+struct vm_entry *check_vaddr (void *vaddr);
+void check_valid_buffer (void *buffer, unsigned size, bool to_write);
+void check_valid_string (void *str);
 void get_argument (void *esp, int arg[], int count);
 
 #endif /* userprog/syscall.h */

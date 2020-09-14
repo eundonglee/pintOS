@@ -1,10 +1,13 @@
 #include "userprog/exception.h"
+#include <debug.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "userprog/syscall.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -149,16 +152,31 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  exit (-1);
+  //printf ("fault : 0x%x, not_present : %d\n", fault_addr, not_present);
+  if (not_present == false)
+	exit (-1);	
+  else
+  {
+	struct vm_entry *vme = find_vme (fault_addr);
+	//printf ("fault_addr : 0x%x, vme : 0x%x, writable : %d, not_present : %d, write : %d, user : %d\n", fault_addr, vme, vme->writable, not_present, write, user);	
+	if (vme == NULL || (write && !vme->writable))
+	  exit (-1);
+	else 
+	{
+	  bool success = handle_mm_fault (vme);
+	  if (!success) exit (-1);
+	}
+  }
+  //exit (-1);
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
+  /* printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+  */
 }
-

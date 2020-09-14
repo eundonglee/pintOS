@@ -2,6 +2,7 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
+#include <hash.h>
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
@@ -125,7 +126,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    /* Owned by thread.c. */
+	struct hash vm;						/* Hash table that manage virtual address space. */
+	struct list mmap_list;				/* list that manage mmap files. */
+	int mapid_next;					/* Id to allocate to the next mmap file inserted to the mmap list. */
+
+	/* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
 
