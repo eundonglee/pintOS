@@ -42,8 +42,10 @@ pagedir_destroy (uint32_t *pd)
         for (pte = pt; pte < pt + PGSIZE / sizeof *pte; pte++)
           if (*pte & PTE_P)
 		  {
+			//printf ("free pte : %p *pte : %p writable : %d kpage : %p\n", pte, *pte, *pte&PTE_W, pte_get_page(*pte));
             palloc_free_page (pte_get_page (*pte));
 		  }
+		//printf ("free pt : %p\n", pt);
         palloc_free_page (pt);
       }
   palloc_free_page (pd);
@@ -114,7 +116,7 @@ pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
     {
       ASSERT ((*pte & PTE_P) == 0);
       *pte = pte_create_user (kpage, writable);
-	 // printf ("set! pte : %p, upage : %p, kpage : %p,  writable : %d\n", pte, upage, kpage, *pte&PTE_W);
+	  //printf ("set! pte : %p, *pte :%p,  upage : %p, kpage : %p,  writable : %d\n", pte, *pte, upage, kpage, *pte&PTE_W);
 	  return true;
     }
   else

@@ -2,8 +2,13 @@
 #include <hash.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "userprog/syscall.h"
+#include "vm/frame.h"
 
 static unsigned vm_hash_func (const struct hash_elem *e, void *aux UNUSED);
 static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
@@ -64,14 +69,20 @@ static bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b, 
 /* Destructor function for destroying vm entry. */
 static void vm_destroy_func (struct hash_elem *e, void *aux UNUSED)
 {
-  free (hash_entry (e, struct vm_entry, elem)); 
+  struct vm_entry *vme = hash_entry (e, struct vm_entry, elem);
+  uint32_t *pd = thread_current ()->pagedir; 
+
+  free_page (pagedir_get_page (pd, vme->vaddr));
+  free (vme); 
 }
 
 /* Load file to physical memory. */
 bool load_file (void *kaddr, struct vm_entry *vme)
 {
   //printf ("load kaddr : 0x%x, vme : 0x%x, read_bytes : %d, zero_bytes : %d\n", kaddr, vme, vme->read_bytes, vme->zero_bytes);
-  int actual_read = file_read_at (vme->file, kaddr, vme->read_bytes, vme->offset);
+  //lock_acquire (& filesys_lock);
+  size_t actual_read = file_read_at (vme->file, kaddr, vme->read_bytes, vme->offset);
+  //lock_release (& filesys_lock);
   if (actual_read != vme->read_bytes) return false;
   memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
   return true;

@@ -160,11 +160,15 @@ page_fault (struct intr_frame *f)
 	struct vm_entry *vme = find_vme (fault_addr);
 	//printf ("fault_addr : 0x%x, vme : 0x%x, writable : %d, not_present : %d, write : %d, user : %d\n", fault_addr, vme, vme->writable, not_present, write, user);	
 	if (vme == NULL || (write && !vme->writable))
+	{
+	  //printf ("fault addr : %p, vme NULL\n", fault_addr);
 	  exit (-1);
+	}
 	else 
 	{
 	  bool success = handle_mm_fault (vme);
-	  if (!success) exit (-1);
+	  if (!success)
+		exit (-1);
 	}
   }
   //exit (-1);

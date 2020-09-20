@@ -256,8 +256,8 @@ lock_release (struct lock *lock)
  
   if (thread_mlfqs != true)
   {
-  remove_with_lock (lock);
-  refresh_priority (); 
+	remove_with_lock (lock);
+	refresh_priority (); 
   }
 
   lock->holder = NULL;

@@ -864,7 +864,7 @@ void donate_priority (void)
 /* When lock is released, remove the threads waiting for the lock from donations list. */
 void remove_with_lock (struct lock *lock)
 {
-  struct thread *h = thread_current ();
+  struct thread *h = lock->holder;
   struct thread *t;
   struct list *d = & h -> donations;
   struct list_elem *e;
@@ -875,6 +875,12 @@ void remove_with_lock (struct lock *lock)
 	while (e != list_end (d))
 	{
 	  t = list_entry (e, struct thread, donation_elem);
+	  /*
+	  if (e->next == NULL) 
+	  {
+		printf("holder : %p, name : %s, thread : %p, name : %s, dlist : %p, head : %p, begin : %p, end : %p, prev : %p, cur : %p, next : %p\n", h, h->name, t, t->name, d, &d->head, list_begin (d), list_end (d), e->prev, e, e->next); 
+	  }
+	  */
 	  if (t->wait_on_lock == lock)
 		e = list_remove (e);
 	  else

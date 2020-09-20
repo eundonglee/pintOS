@@ -9,6 +9,7 @@
 
 typedef int pid_t;
 
+/* Lock to prevent another thread from writing on file while file being read. */
 struct lock filesys_lock;
 
 void syscall_init (void);

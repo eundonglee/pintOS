@@ -1,0 +1,56 @@
+Binary file ./vm/.frame.c.swp matches
+./vm/page.c:  hash_insert (vm, &vme->elem);
+./vm/page.c:  hash_delete (vm, &vme->elem);
+./vm/page.c:  return hash_int ((int) vme->vaddr);
+./vm/page.c:  //printf ("load kaddr : 0x%x, vme : 0x%x, read_bytes : %d, zero_bytes : %d\n", kaddr, vme, vme->read_bytes, vme->zero_bytes);
+./vm/page.c:  size_t actual_read = file_read_at (vme->file, kaddr, vme->read_bytes, vme->offset);
+./vm/page.c:  if (actual_read != vme->read_bytes) return false;
+./vm/page.c:  memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
+Binary file ./vm/.page.c.swp matches
+./vm/frame.c:  //printf ("page : %p kaddr : %p vaddr : %p type : %d\n", page, page->kaddr, page->vme->vaddr, page->vme->type);
+./vm/frame.c:  pagedir_clear_page (page->thread->pagedir, page->vme->vaddr);
+./vm/frame.c:	vaddr = page->vme->vaddr;
+./vm/frame.c:	if (vaddr > PHYS_BASE) printf ("page : %p, vme :%p, vaddr : %p, kaddr : %p\n", page, page->vme, page->vme->vaddr, page->kaddr);
+./vm/frame.c:	  if (VM_BIN == page->vme->type)
+./vm/frame.c:	    //printf ("kaddr : %p vaddr : %p accessed : %d type: %d\n", page->kaddr, vaddr, pagedir_is_accessed (pd, vaddr), page->vme->type);
+./vm/frame.c:			page->vme->swap_slot = swap_slot;
+./vm/frame.c:			page->vme->type = VM_ANON;
+./vm/frame.c:	  else if (VM_FILE == page->vme->type)
+./vm/frame.c:		  file_write_at (page->vme->file, vaddr, page->vme->read_bytes, page->vme->offset);
+./vm/frame.c:	  else if (VM_ANON == page->vme->type)
+./vm/frame.c:		  page->vme->swap_slot = swap_slot;
+Binary file ./userprog/.process.c.swp matches
+Binary file ./userprog/.syscall.c.swp matches
+Binary file ./userprog/.exception.c.swp matches
+./userprog/syscall.c:	vme->vaddr = addr;
+./userprog/syscall.c:	vme->type = VM_FILE;
+./userprog/syscall.c:	vme->is_loaded = false;
+./userprog/syscall.c:	vme->writable = true;
+./userprog/syscall.c:	vme->file = new_f;
+./userprog/syscall.c:	vme->offset = ofs;
+./userprog/syscall.c:	vme->read_bytes = size < PGSIZE? size: PGSIZE;
+./userprog/syscall.c:	vme->zero_bytes = size < PGSIZE? PGSIZE-size : 0;
+./userprog/syscall.c:	list_push_back (& mmf->vme_list, & vme->mmap_elem);
+./userprog/syscall.c:	if (to_write == true && vme->writable == false) 
+./userprog/process.c:	  vme->type = VM_BIN;
+./userprog/process.c:	  vme->vaddr = (void *) upage;
+./userprog/process.c:	  vme->writable = writable;
+./userprog/process.c:	  vme->is_loaded = false;
+./userprog/process.c:	  vme->file = file;
+./userprog/process.c:	  vme->offset = ofs;
+./userprog/process.c:	  vme->read_bytes = page_read_bytes;
+./userprog/process.c:	  vme->zero_bytes = page_zero_bytes;
+./userprog/process.c:	  //printf ("vme : 0x%x, vaddr : 0x%x, file : 0x%x, writable : %d\n", vme, vme->vaddr, file, vme->writable);
+./userprog/process.c:  vme->type = VM_ANON;
+./userprog/process.c:  vme->vaddr = (void *) (((uint8_t *) PHYS_BASE) - PGSIZE);
+./userprog/process.c:  vme->writable = true;
+./userprog/process.c:  vme->is_loaded = true;
+./userprog/process.c:	vaddr = vme->vaddr;
+./userprog/process.c:	  file_write_at (file, vaddr, vme->read_bytes, vme->offset);
+./userprog/process.c:  printf ("load page : %p, vme : %p, vaddr %p, type : %d\n", page, vme, vme->vaddr, vme->type);
+./userprog/process.c:  switch (vme->type)
+./userprog/process.c:	  swap_in (vme->swap_slot, kaddr);
+./userprog/process.c:	if (install_page (vme->vaddr, kaddr, vme->writable))
+./userprog/process.c:  //printf ("installed(success : %d) vaddr:0x%x, kaddr:0x%x, writable:%d\n",  success, vme->vaddr, kaddr, vme->writable);
+./userprog/exception.c:	//printf ("fault_addr : 0x%x, vme : 0x%x, writable : %d, not_present : %d, write : %d, user : %d\n", fault_addr, vme, vme->writable, not_present, write, user);	
+./userprog/exception.c:	if (vme == NULL || (write && !vme->writable))

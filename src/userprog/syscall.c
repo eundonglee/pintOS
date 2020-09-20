@@ -15,6 +15,7 @@
 #include "devices/input.h"
 #include "filesys/filesys.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -82,16 +83,12 @@ int open (const char *file)
 
   f = filesys_open (file);  
 
+  lock_release (& filesys_lock);
+
   if (f != NULL)
-  {
-    lock_release (& filesys_lock);
     return process_add_file (f); 
-  }
   else
-  {
-    lock_release (& filesys_lock);
     return -1;
-  }
 }
 
 /* Return file size. */
@@ -116,6 +113,7 @@ int read (int fd, void *buffer, unsigned size)
   lock_acquire (& filesys_lock);
   //printf ("read lock aquired f: 0x%x t: 0x%x, h: 0x%x\n", f, thread_current(), filesys_lock.holder);
 
+  pin_address (buffer, size);
   if (fd == 0)
   {
     for (actual_size = 0; (unsigned) actual_size < size; actual_size++)
@@ -136,6 +134,7 @@ int read (int fd, void *buffer, unsigned size)
     return -1;
   }
   //printf ("read lock release f: 0x%x t: 0x%x, h: 0x%x\n", f, thread_current(), filesys_lock.holder);
+  unpin_address (buffer, size);
   lock_release (& filesys_lock);
   return actual_size;
 }
@@ -148,6 +147,7 @@ int write (int fd, void *buffer, unsigned size)
 
   lock_acquire (& filesys_lock);
 
+  pin_address (buffer, size);
   if (fd == 1)
   {
     putbuf (buffer, size);
@@ -160,9 +160,11 @@ int write (int fd, void *buffer, unsigned size)
   else
   {
     lock_release (& filesys_lock);
+	unpin_address (buffer, size);
     return -1;
   }
 
+  unpin_address (buffer, size);
   lock_release (& filesys_lock);
   return actual_size;
 }
@@ -222,6 +224,7 @@ int mmap (int fd, void *addr)
 	vme->vaddr = addr;
 	vme->type = VM_FILE;
 	vme->is_loaded = false;
+	vme->pinned = false;
 	vme->writable = true;
 	vme->file = new_f;
 	vme->offset = ofs;
@@ -235,7 +238,7 @@ int mmap (int fd, void *addr)
 	size -= PGSIZE;
   }
 
-  //printf ("mapid : %d\n", mapid);
+  //printf ("mapid : %d vme : %p vaddr : %p\n", mapid, vme, vme->vaddr);
   return mapid;
 }
 
