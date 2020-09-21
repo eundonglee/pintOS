@@ -158,16 +158,23 @@ page_fault (struct intr_frame *f)
   else
   {
 	struct vm_entry *vme = find_vme (fault_addr);
+	//printf ("vme : %p\n", vme);
 	//printf ("fault_addr : 0x%x, vme : 0x%x, writable : %d, not_present : %d, write : %d, user : %d\n", fault_addr, vme, vme->writable, not_present, write, user);	
-	if (vme == NULL || (write && !vme->writable))
+	if (vme == NULL)
 	{
-	  //printf ("fault addr : %p, vme NULL\n", fault_addr);
-	  exit (-1);
+	  if (verify_stack (f->esp, fault_addr))
+	  {
+		if (!expand_stack (fault_addr))
+		  exit (-1);
+	  }
+	  else 
+	   exit (-1);
 	}
-	else 
+	else
 	{
-	  bool success = handle_mm_fault (vme);
-	  if (!success)
+	  if (write && !vme->writable)
+	    exit (-1);
+	  if (!handle_mm_fault (vme))
 		exit (-1);
 	}
   }

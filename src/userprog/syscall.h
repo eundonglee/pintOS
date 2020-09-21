@@ -30,7 +30,7 @@ int mmap (int fd, void *addr);
 void munmap (int mapping);
 void check_address (void *addr);
 struct vm_entry *check_vaddr (void *vaddr);
-void check_valid_buffer (void *buffer, unsigned size, bool to_write);
+void check_valid_buffer (void *esp, void *buffer, unsigned size, bool to_write);
 void check_valid_string (void *str);
 void get_argument (void *esp, int arg[], int count);
 

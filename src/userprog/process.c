@@ -609,7 +609,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	  vme->read_bytes = page_read_bytes;
 	  vme->zero_bytes = page_zero_bytes;
 	  insert_vme (& thread_current ()->vm, vme);
-	  //printf ("vme : 0x%x, vaddr : 0x%x, file : 0x%x, writable : %d\n", vme, vme->vaddr, file, vme->writable);
+	  //printf ("load seg vme : 0x%x, vaddr : 0x%x, file : 0x%x, writable : %d\n", vme, vme->vaddr, file, vme->writable);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -664,6 +664,55 @@ setup_stack (void **esp)
   vme->pinned = false;
   insert_vme (& thread_current ()->vm, vme);
 
+  //printf ("setup vaddr : %p\n", vme->vaddr);
+  return success;
+}
+
+/* Return true if the pointer is in the inside the stack growth limit.
+   Otherwise, return false. */
+bool verify_stack (void *esp, void *sp)
+{
+  //printf ("verify esp : %p, sp  : %p\n", esp, sp);
+  if (sp > esp-32)
+	return true;
+  else
+	return false;
+}
+
+/* Expand the memory space for stack and return success or not. */
+bool expand_stack (void *addr)
+{
+  struct page *page = NULL;
+  struct vm_entry *vme = NULL;
+  bool success = false;
+
+  if (addr < PHYS_BASE - 2000 * PGSIZE)
+	return success;
+
+  for (; !find_vme (addr); addr += PGSIZE)
+  {
+  page = alloc_page (PAL_USER | PAL_ZERO);
+
+  success  = install_page (pg_round_down (addr), page->kaddr, true);
+  if (!success)
+  {
+	free_page (page->kaddr);
+	return success;
+  }
+  
+  vme = malloc (sizeof (struct vm_entry));
+
+  page->vme = vme;
+  vme->type = VM_ANON;
+  vme->vaddr = pg_round_down (addr);
+  vme->writable = true;
+  vme->is_loaded = true;
+  vme->pinned = false;
+
+  insert_vme (& thread_current ()->vm, vme);
+  }
+
+  //printf ("expand kaddr : %p, vaddr : %p\n", page->kaddr, vme->vaddr);
   return success;
 }
 
@@ -740,8 +789,8 @@ void do_munmap (struct mmap_file *mmf)
 	vaddr = vme->vaddr;
 	if (pagedir_is_dirty (thread_current ()->pagedir, vaddr))
 	{
-	  lock_acquire (&filesys_lock);
 	  pin_address (vaddr, vme->read_bytes);
+	  lock_acquire (&filesys_lock);
 	  file_write_at (file, vaddr, vme->read_bytes, vme->offset);
 	  lock_release (&filesys_lock);
 	}
@@ -764,22 +813,26 @@ bool handle_mm_fault (struct vm_entry *vme)
   if (kaddr == NULL) return false;
 
   //printf ("load page : %p, vme : %p, vaddr %p, type : %d\n", page, vme, vme->vaddr, vme->type);
-  switch (vme->type)
+  if (vme)
   {
-	case VM_BIN:
-	case VM_FILE:
-	  success = load_file (kaddr, vme);
-	  break;
+	switch (vme->type)
+	{
+	  case VM_BIN:
+	  case VM_FILE:
+		success = load_file (kaddr, vme);
+		break;
 
-	case VM_ANON:
-	  swap_in (vme->swap_slot, kaddr);
-	  success = true;
-	  break;
+	  case VM_ANON:
+		swap_in (vme->swap_slot, kaddr);
+		success = true;
+		break;
 
-	default:
-	  return false;
-	  break;
+	  default:
+		return false;
+	    break;
+	}
   }
+
   if (success)
   {
 	success = install_page (vme->vaddr, kaddr, vme->writable);

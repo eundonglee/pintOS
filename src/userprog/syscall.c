@@ -79,6 +79,9 @@ bool remove (const char *file)
 int open (const char *file)
 {
   struct file *f;
+  int fd;
+  //debug_backtrace ();
+
   lock_acquire (& filesys_lock);
 
   f = filesys_open (file);  
@@ -86,7 +89,10 @@ int open (const char *file)
   lock_release (& filesys_lock);
 
   if (f != NULL)
-    return process_add_file (f); 
+  {
+    fd = process_add_file (f); 
+	return fd;
+  }
   else
     return -1;
 }
@@ -109,11 +115,11 @@ int read (int fd, void *buffer, unsigned size)
   uint8_t *bf_ptr;
   int actual_size;
 
+  pin_address (buffer, size);
   //printf ("read f: 0x%x t: 0x%x, h: 0x%x\n", f, thread_current(), filesys_lock.holder);
   lock_acquire (& filesys_lock);
   //printf ("read lock aquired f: 0x%x t: 0x%x, h: 0x%x\n", f, thread_current(), filesys_lock.holder);
 
-  pin_address (buffer, size);
   if (fd == 0)
   {
     for (actual_size = 0; (unsigned) actual_size < size; actual_size++)
@@ -145,9 +151,9 @@ int write (int fd, void *buffer, unsigned size)
   struct file *f = process_get_file (fd);
   int actual_size;
 
+  pin_address (buffer, size);
   lock_acquire (& filesys_lock);
 
-  pin_address (buffer, size);
   if (fd == 1)
   {
     putbuf (buffer, size);
@@ -282,18 +288,27 @@ void check_address (void *addr)
 */
 
 /* Check whether the buffer area is covered by vm entries. If not, exit the thread. */
-void check_valid_buffer (void *buffer, unsigned size, bool to_write)
+void check_valid_buffer (void *esp, void *buffer, unsigned size, bool to_write)
 {
   struct vm_entry *vme;
-  void *ptr = buffer;
+  void *ptr = pg_round_down (buffer);
 
+  //printf ("esp : %p, buffer : %p\n", esp, buffer);
   check_address (buffer);
- 
-  for (;ptr < pg_round_up (buffer+size); ptr += PGSIZE)
+
+  for (;ptr < buffer+size; ptr += PGSIZE)
   {
 	vme = find_vme (ptr);
-	if (vme == NULL) 
-	  exit(-1);
+	if (vme == NULL)
+	{
+	  if (!verify_stack (esp, buffer))
+		exit (-1);
+	  else
+	  {
+		if (!expand_stack (buffer))
+		  exit (-1);
+	  }
+	}
 	if (to_write == true && vme->writable == false) 
 	  exit (-1);
   }
@@ -400,14 +415,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_READ:
       check_address ((void *) (ptr + 3));
       get_argument (ptr, arg, 3);
-	  check_valid_buffer ((void *)arg[1], (unsigned)arg[2], true);
+	  check_valid_buffer (f->esp, (void *)arg[1], (unsigned)arg[2], true);
       f -> eax = read (arg[0], (void *)arg[1], (unsigned)arg[2]);
       break;
 
     case SYS_WRITE:
       check_address ((void *) (ptr + 3));
       get_argument (ptr, arg, 3);
-	  check_valid_buffer ((void *) arg[1], (unsigned)arg[2], false);
+	  check_valid_buffer (f->esp, (void *) arg[1], (unsigned)arg[2], false);
       f -> eax = write (arg[0], (void *)arg[1], (unsigned)arg[2]);
       break;
 

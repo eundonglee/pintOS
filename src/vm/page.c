@@ -80,9 +80,9 @@ static void vm_destroy_func (struct hash_elem *e, void *aux UNUSED)
 bool load_file (void *kaddr, struct vm_entry *vme)
 {
   //printf ("load kaddr : 0x%x, vme : 0x%x, read_bytes : %d, zero_bytes : %d\n", kaddr, vme, vme->read_bytes, vme->zero_bytes);
-  //lock_acquire (& filesys_lock);
+  lock_acquire (& filesys_lock);
   size_t actual_read = file_read_at (vme->file, kaddr, vme->read_bytes, vme->offset);
-  //lock_release (& filesys_lock);
+  lock_release (& filesys_lock);
   if (actual_read != vme->read_bytes) return false;
   memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
   return true;
