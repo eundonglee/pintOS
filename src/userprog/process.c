@@ -741,6 +741,7 @@ void do_munmap (struct mmap_file *mmf)
 	if (pagedir_is_dirty (thread_current ()->pagedir, vaddr))
 	{
 	  lock_acquire (&filesys_lock);
+	  pin_address (vaddr, vme->read_bytes);
 	  file_write_at (file, vaddr, vme->read_bytes, vme->offset);
 	  lock_release (&filesys_lock);
 	}

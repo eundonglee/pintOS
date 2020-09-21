@@ -869,24 +869,15 @@ void remove_with_lock (struct lock *lock)
   struct list *d = & h -> donations;
   struct list_elem *e;
 
-  if (!list_empty (d))
-  { 
-	e = list_begin (d);
-	while (e != list_end (d))
-	{
-	  t = list_entry (e, struct thread, donation_elem);
-	  /*
-	  if (e->next == NULL) 
-	  {
-		printf("holder : %p, name : %s, thread : %p, name : %s, dlist : %p, head : %p, begin : %p, end : %p, prev : %p, cur : %p, next : %p\n", h, h->name, t, t->name, d, &d->head, list_begin (d), list_end (d), e->prev, e, e->next); 
-	  }
-	  */
-	  if (t->wait_on_lock == lock)
-		e = list_remove (e);
-	  else
-		e = list_next (e);
-	}
-  }	
+  e = list_begin (d);
+  while (e != list_end (d))
+  {
+	t = list_entry (e, struct thread, donation_elem);
+	if (t->wait_on_lock == lock)
+	  e = list_remove (e);
+	else
+  	e = list_next (e);
+  }
 }
 
 /* When priorities of threads were changed, refresh donation of priority. */
