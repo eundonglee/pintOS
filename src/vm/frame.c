@@ -164,6 +164,7 @@ void *try_to_free_pages (enum palloc_flags flags)
   return palloc_get_page (flags);
 }
 
+/* Pin the buffer address area and prevent it from being freed. */
 void pin_address (void *buffer, size_t size)
 {
   struct vm_entry *vme;
@@ -178,6 +179,7 @@ void pin_address (void *buffer, size_t size)
   }
 }
 
+/* Unpin the buffer address area and allow it to be freed. */
 void unpin_address (void *buffer, size_t size)
 {
   struct vm_entry *vme;
